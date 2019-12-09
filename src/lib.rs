@@ -5,11 +5,11 @@ use wasm_bindgen_futures::JsFuture;
 mod pouchdb_sys;
 use pouchdb_sys::PouchDB as JsPouchDB;
 
-mod options;
+pub mod options;
 use options::{create::CreateOptions, fetch::FetchOptions};
-mod responses;
+pub mod responses;
 use responses::*;
-mod error;
+pub mod error;
 use error::Error;
 
 pub struct PouchDB {
