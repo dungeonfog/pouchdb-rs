@@ -4,9 +4,6 @@ version = "0.1.0"
 authors = ["Follpvosten <wolfi@karpador.xyz>"]
 edition = "2018"
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4"
