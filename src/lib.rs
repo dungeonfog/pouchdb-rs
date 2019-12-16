@@ -30,8 +30,8 @@ impl PouchDB {
 
     pub async fn destroy(self) -> Result<DestroyResponse, Error> {
         JsFuture::from(self.inner.destroy())
-            .await
-            .map(|val| val.into_serde().unwrap())
+            .await?
+            .into_serde()
             .map_err(Error::from)
     }
 
@@ -40,8 +40,8 @@ impl PouchDB {
         T: Serialize,
     {
         JsFuture::from(self.inner.put(JsValue::from_serde(doc)?))
-            .await
-            .map(|val| val.into_serde().unwrap())
+            .await?
+            .into_serde()
             .map_err(Error::from)
     }
 
@@ -50,8 +50,8 @@ impl PouchDB {
         T: Serialize,
     {
         JsFuture::from(self.inner.post(JsValue::from_serde(doc)?))
-            .await
-            .map(|val| val.into_serde().unwrap())
+            .await?
+            .into_serde()
             .map_err(Error::from)
     }
 
@@ -60,8 +60,8 @@ impl PouchDB {
         T: DeserializeOwned,
     {
         JsFuture::from(self.inner.get(doc_id.into(), JsValue::from_serde(options)?))
-            .await
-            .map(|val| val.into_serde().unwrap())
+            .await?
+            .into_serde()
             .map_err(Error::from)
     }
 
@@ -70,8 +70,8 @@ impl PouchDB {
         T: Serialize,
     {
         JsFuture::from(self.inner.remove(JsValue::from_serde(doc)?))
-            .await
-            .map(|val| val.into_serde().unwrap())
+            .await?
+            .into_serde()
             .map_err(Error::from)
     }
 }
