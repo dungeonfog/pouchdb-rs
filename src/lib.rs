@@ -116,13 +116,11 @@ impl PouchDB {
     /// Fetch a document
     ///
     /// Retrieves a document, specified by `doc_id`.
-    pub async fn fetch<D>(
+    pub async fn fetch(
         &self,
         doc_id: String,
         options: &FetchOptions,
     ) -> Result<SerializedDocument, Error>
-    where
-        D: Document + DeserializeOwned + ?Sized,
     {
         JsFuture::from(
             self.0
