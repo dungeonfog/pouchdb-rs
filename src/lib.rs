@@ -347,6 +347,11 @@ impl PouchDB {
     pub async fn replicate_oneshot<'a>(_source: PouchDBOrStringRef<'a>, _target: PouchDBOrStringRef<'a>, _options: &Replication) -> Result<(), Error> {
         Ok(())
     }
+
+    pub async fn close(&self) -> Result<(), Error> {
+        JsFuture::from(self.0.close()).await?;
+        Ok(())
+    }
 }
 
 impl std::fmt::Debug for PouchDB {
