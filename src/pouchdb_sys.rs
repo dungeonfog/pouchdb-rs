@@ -65,17 +65,17 @@ extern "C" {
     #[wasm_bindgen(method, js_class = default, js_name = changes)]
     pub fn changes_oneshot(this: &PouchDB, options: JsValue) -> Promise;
 
-    #[wasm_bindgen(js_class = default)]
-    pub fn replicate(source: JsValue, target: JsValue) -> JsValue;
+    #[wasm_bindgen(static_method_of = PouchDB)]
+    pub fn replicate(source: &JsValue, target: &JsValue) -> JsValue;
 
-    #[wasm_bindgen(js_class = default, js_name = replicate)]
-    pub fn replicate_with_options(source: JsValue, target: JsValue, options: JsValue) -> JsValue;
+    #[wasm_bindgen(static_method_of = PouchDB, js_name = replicate)]
+    pub fn replicate_with_options(source: &JsValue, target: &JsValue, options: JsValue) -> JsValue;
 
-    #[wasm_bindgen(js_class = default)]
-    pub fn sync(src: JsValue, target: JsValue) -> JsValue;
+    #[wasm_bindgen(static_method_of = PouchDB)]
+    pub fn sync(src: &JsValue, target: &JsValue) -> JsValue;
 
-    #[wasm_bindgen(js_class = default, js_name = sync)]
-    pub fn sync_with_options(src: JsValue, target: JsValue, options: JsValue) -> JsValue;
+    #[wasm_bindgen(static_method_of = PouchDB, js_name = sync)]
+    pub fn sync_with_options(src: &JsValue, target: &JsValue, options: JsValue) -> JsValue;
 
     #[wasm_bindgen(method, js_class = default, js_name = putAttachment)]
     pub fn put_attachment(

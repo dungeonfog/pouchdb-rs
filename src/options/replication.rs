@@ -9,14 +9,6 @@ use crate::events::SequenceID;
 
 #[derive(Serialize, Default, Debug)]
 pub struct Replication {
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub live: bool,
-    /// If true will attempt to retry replications in the case of failure (due to being
-    /// offline), using a backoff algorithm that retries at longer and longer intervals
-    /// until a connection is re-established, with a maximum delay of 10 minutes. Only
-    /// applicable if [live] is also true.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub retry: bool,
     /// Reference a filter function from a design document to selectively get updates.
     /// To use a view function, pass `_view` here and provide a reference to the view
     /// function in [view].

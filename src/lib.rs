@@ -1,5 +1,5 @@
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::{TryFrom, TryInto, AsRef},
     ops::Deref,
 };
 
@@ -29,6 +29,7 @@ pub mod events;
 use events::{
     SequenceID,
     changes_event_emitter::{ChangesEventEmitter, ChangeEvent},
+    replication_event_emitter::{ReplicationEventEmitter},
 };
 
 pub enum PouchDBOrStringRef<'a> {
@@ -287,9 +288,67 @@ impl PouchDB {
         }
     }
 
-    pub fn replicate(source: PouchDBOrStringRef, target: PouchDBOrStringRef, options: &Replication) -> Result<(), Error> {
-        unimplemented!()
-        // JsPouchDB::replicate();
+    /// Replicate data from `source` to `target`. Both the `source` and `target` can be a
+    /// PouchDB instance or a string representing a CouchDB database URL or the name of a
+    /// local PouchDB database. This call will track future changes and also replicate
+    /// them automatically.
+    /// 
+    /// If `retry` == true will attempt to retry replications in the case of failure (due
+    /// to being offline), using a backoff algorithm that retries at longer and longer
+    /// intervals until a connection is re-established, with a maximum delay of 10 minutes.
+    /// 
+    /// This method returns an object with the method
+    /// [ReplicationEventEmitter::cancel], which you call if you want to cancel live
+    /// replication.
+    /// 
+    /// Replication is an event emitter like [changes] and emits the `complete`, `active`,
+    /// `paused`, `change`, `denied` and `error` events.
+    /// 
+    /// Note that replication is supported for both local and remote databases. So you
+    /// can replicate from local to local or from remote to remote.
+    ///
+    /// However, if you replicate from remote to remote, then the changes will flow
+    /// through PouchDB. If you want to trigger a server-initiated replication, please
+    /// use regular ajax to POST to the CouchDB `_replicate` endpoint, as described in
+    /// the CouchDB docs.
+    pub fn replicate(source: PouchDBOrStringRef, target: PouchDBOrStringRef, options: &Replication, retry: bool) -> Result<ReplicationEventEmitter, Error> {
+        let js_options = JsValue::from_serde(options)?;
+        if let Some(query_params) = &options.query_params {
+            if let (Some(js_options), Some(query_params)) = (
+                Object::try_from(&js_options),
+                Object::try_from(&query_params),
+            ) {
+                Object::assign(js_options, query_params);
+            }
+            if let Some(since) = &options.since {
+                Reflect::set(&js_options, &JsValue::from_str("since"), &since.0)?;
+            }
+        }
+        Reflect::set(&js_options, &JsValue::from_str("live"), &JsValue::TRUE)?;
+        if retry {
+            Reflect::set(&js_options, &JsValue::from_str("retry"), &JsValue::TRUE)?;
+        }
+
+        // these are needed to keep the references alive
+        let source_string;
+        let target_string;
+
+        let source = match source {
+            PouchDBOrStringRef::PouchDB(db) => <JsPouchDB as AsRef<wasm_bindgen::JsValue>>::as_ref(&db.0),
+            PouchDBOrStringRef::String(s) => {
+                source_string = JsValue::from_str(s);
+                &source_string
+            },
+        };
+        let target = match target {
+            PouchDBOrStringRef::PouchDB(db) => db.0.as_ref(),
+            PouchDBOrStringRef::String(s) => {
+                target_string = JsValue::from_str(s);
+                &target_string
+            },
+        };
+
+        Ok(ReplicationEventEmitter::new(JsPouchDB::replicate_with_options(source, target, js_options)))
     }
 
     pub async fn replicate_oneshot<'a>(_source: PouchDBOrStringRef<'a>, _target: PouchDBOrStringRef<'a>, _options: &Replication) -> Result<(), Error> {

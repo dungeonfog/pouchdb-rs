@@ -3,6 +3,7 @@ use std::convert::AsRef;
 use wasm_bindgen::{closure::Closure, JsValue};
 
 pub mod changes_event_emitter;
+pub mod replication_event_emitter;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SequenceID(pub(crate) JsValue);

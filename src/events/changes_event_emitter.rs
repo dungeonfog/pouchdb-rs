@@ -46,6 +46,7 @@ impl ChangeEvent {
     }
 }
 
+/// Returned by [PouchDB::changes]
 pub struct ChangesEventEmitter(EventEmitter);
 
 impl ChangesEventEmitter {
@@ -84,7 +85,7 @@ impl ChangesEventEmitter {
     /// the changes should trigger this event.
     pub fn add_complete_listener(
         &self,
-        listener: impl Fn() + 'static,
+        listener: impl Fn() + 'static, // TODO: FnOnce
     ) -> Result<EventListener, JsValue> {
         self.0.add_listener(&EventName::string("complete"), move |_| {
             listener()
@@ -95,7 +96,7 @@ impl ChangesEventEmitter {
     /// unrecoverable failure.
     pub fn add_error_listener(
         &self,
-        listener: impl Fn(JsValue) + 'static,
+        listener: impl Fn(JsValue) + 'static, // TODO: FnOnce
     ) -> Result<EventListener, JsValue> {
         self.0.add_listener(&EventName::string("error"), listener)
     }
