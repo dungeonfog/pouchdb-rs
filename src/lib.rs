@@ -143,7 +143,7 @@ impl PouchDB {
         Reflect::set(
             &value,
             &JsValue::from_str("_id"),
-            &JsValue::from_str(doc.id()),
+            &JsValue::from_str(&doc.id()),
         )?;
         Reflect::set(
             &value,

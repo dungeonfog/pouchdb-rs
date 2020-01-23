@@ -13,7 +13,7 @@ pub struct Revision(pub(crate) JsValue);
 /// This is handled internally.
 pub trait Document {
     /// The unique identifier for this document. Can be any string.
-    fn id(&self) -> &str;
+    fn id(&self) -> String;
     /// The opaque revision id of this document.
     fn rev(&self) -> Option<&Revision>;
     /// Serialize the document into a JSON string.
@@ -38,7 +38,7 @@ where
     Reflect::set(
         &object,
         &JsValue::from_str("_id"),
-        &JsValue::from_str(doc.id()),
+        &JsValue::from_str(&doc.id()),
     )?;
     if let Some(rev) = doc.rev() {
         Reflect::set(&object, &JsValue::from_str("_rev"), &rev.0)?;
