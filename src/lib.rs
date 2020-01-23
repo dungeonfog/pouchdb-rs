@@ -353,3 +353,13 @@ impl PouchDB {
         Ok(())
     }
 }
+
+impl std::fmt::Debug for PouchDB {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        if let Some(name) = Reflect::get(&self.0, &JsValue::from_str("name")).ok().and_then(|name| name.as_string()) {
+            write!(f, "PouchDB {}", name)
+        } else {
+            write!(f, "PouchDB with unknown name")
+        }
+    }
+}
