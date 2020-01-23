@@ -70,3 +70,12 @@ impl Default for AllDocsOptions {
         }
     }
 }
+
+impl AllDocsOptions {
+    /// Set the prefix filter for the returned keys.
+    pub fn set_prefix(&mut self, prefix: &str) {
+        // See section "Prefix search" in the PouchDB batch fetch documentation.
+        self.startkey = Some(prefix.to_owned());
+        self.endkey = Some(format!("{}\u{fff0}", prefix));
+    }
+}
