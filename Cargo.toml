@@ -1,12 +1,13 @@
 [package]
 name = "pouchdb"
 version = "0.1.0"
-authors = ["Follpvosten <wolfi@karpador.xyz>"]
+authors = ["Follpvosten <wolfi@karpador.xyz>", "Andreas Monitzer <andreas@monitzer.com>"]
 edition = "2018"
 
 [dependencies]
-wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"] }
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4"
-js-sys = "0.3.30"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["Blob", "Event"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
