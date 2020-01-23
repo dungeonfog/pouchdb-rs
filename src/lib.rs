@@ -91,8 +91,7 @@ impl PouchDB {
             self.0.put(js_doc)
         })
         .await?
-        .into_serde()
-        .map_err(Error::from)
+        .try_into()
     }
 
     /// Create a document
@@ -109,8 +108,7 @@ impl PouchDB {
     {
         JsFuture::from(self.0.post(document::serialize(doc)?))
             .await?
-            .into_serde()
-            .map_err(Error::from)
+            .try_into()
     }
 
     /// Fetch a document
@@ -153,9 +151,7 @@ impl PouchDB {
         Reflect::set(&value, &JsValue::from_str("_deleted"), &JsValue::TRUE)?;
 
         JsFuture::from(self.0.put(value.into()))
-            .await?
-            .into_serde()
-            .map_err(Error::from)
+            .await?.try_into()
     }
 
     /// Create/update a batch of documents
@@ -171,8 +167,7 @@ impl PouchDB {
         }
         JsFuture::from(self.0.bulk_docs(array.into()))
             .await?
-            .into_serde()
-            .map_err(Error::from)
+            .try_into()
     }
 
     /// Fetch multiple documents, indexed and sorted by the id. Deleted documents are only included
