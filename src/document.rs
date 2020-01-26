@@ -8,6 +8,12 @@ use web_sys::Blob;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Revision(pub(crate) JsValue);
 
+impl AsRef<JsValue> for Revision {
+    fn as_ref(&self) -> &JsValue {
+        &self.0
+    }
+}
+
 /// A document stored in the database. Everything serialized will be stored.
 ///
 /// Do *not* include the `id` and `rev` parameters in the json!
