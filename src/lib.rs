@@ -116,13 +116,13 @@ impl PouchDB {
     /// Retrieves a document, specified by `doc_id`.
     pub async fn fetch(
         &self,
-        doc_id: String,
+        doc_id: &str,
         options: &FetchOptions,
     ) -> Result<SerializedDocument, Error>
     {
         JsFuture::from(
             self.0
-                .get_with_options(doc_id.into(), JsValue::from_serde(options)?),
+                .get_with_options(JsValue::from_str(doc_id), JsValue::from_serde(options)?),
         )
         .await?
         .try_into()
