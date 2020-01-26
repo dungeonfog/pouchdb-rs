@@ -1,8 +1,9 @@
-use js_sys::{JsString, Reflect};
+use js_sys::{JsString, Reflect, Object};
 use serde::Deserialize;
 use serde_json::error::Result as SerdeResult;
 use std::{collections::HashMap, convert::TryFrom};
 use wasm_bindgen::{JsCast, JsValue};
+use web_sys::Blob;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Revision(pub(crate) JsValue);
@@ -18,6 +19,10 @@ pub trait Document {
     fn rev(&self) -> Option<&Revision>;
     /// Serialize the document into a JSON string.
     fn json(&self) -> String;
+    /// Optionally, you can add binary attachments here.
+    fn attachments(&self) -> HashMap<String, Blob> {
+        HashMap::new()
+    }
     /// Return true and [PouchDB::put] this document (or pass to [PouchDB::bulk_docs]) to delete it.
     fn deleted(&self) -> bool {
         false
@@ -33,7 +38,19 @@ where
         Reflect::set(&object, &JsValue::from_str("_deleted"), &JsValue::TRUE)?;
         object.into()
     } else {
-        js_sys::JSON::parse(&doc.json())?
+        let attachments = doc.attachments();
+        let doc = js_sys::JSON::parse(&doc.json())?;
+        if !attachments.is_empty() {
+            let root = Object::new();
+            for (name, blob) in &attachments {
+                let attachment = Object::new();
+                Reflect::set(&attachment, &JsValue::from_str("content_type"), &JsValue::from_str(&blob.type_()))?;
+                Reflect::set(&attachment, &JsValue::from_str("data"), &blob)?;
+                Reflect::set(&root, &JsValue::from_str(&name), &attachment)?;
+            }
+            Reflect::set(&doc, &JsValue::from_str("_attachments"), &root)?;
+        }
+        doc
     };
     Reflect::set(
         &object,
@@ -58,11 +75,11 @@ pub struct SerializedDocument {
 }
 
 impl SerializedDocument {
-    pub fn deserialize<T>(self) -> SerdeResult<T>
+    pub fn deserialize<T>(self) -> (String, Option<Revision>, SerdeResult<T>, HashMap<String, web_sys::Blob>)
     where
         T: Document + for<'a> Deserialize<'a>,
     {
-        self.data.into_serde()
+        (self.id, self.rev, self.data.into_serde(), self.attachments)
     }
 
     pub(crate) fn new_deleted(id: &str, rev: JsValue) -> Self {
