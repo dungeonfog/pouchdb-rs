@@ -77,7 +77,7 @@ pub struct SerializedDocument {
 impl SerializedDocument {
     pub fn deserialize<T>(self) -> (String, Option<Revision>, SerdeResult<T>, HashMap<String, web_sys::Blob>)
     where
-        T: Document + for<'a> Deserialize<'a>,
+        T: for<'a> Deserialize<'a>,
     {
         (self.id, self.rev, self.data.into_serde(), self.attachments)
     }
