@@ -4,7 +4,6 @@ use std::{
 };
 
 use js_sys::{Object, Reflect, Array};
-use serde::de::DeserializeOwned;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
