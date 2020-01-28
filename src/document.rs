@@ -1,8 +1,9 @@
-use js_sys::{JsString, Reflect, Object};
-use serde::Deserialize;
+use js_sys::{JsString, Reflect, Object, Promise, Array, Uint8Array, JSON};
+use serde::{Serialize, Deserialize};
 use serde_json::error::Result as SerdeResult;
 use std::{collections::HashMap, convert::TryFrom};
 use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen_futures::JsFuture;
 use web_sys::Blob;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -93,6 +94,24 @@ impl SerializedDocument {
     {
         (self.id, self.rev, self.data.into_serde(), self.attachments)
     }
+    pub async fn into_serialized(self) -> Result<SerializedDocumentData, crate::error::Error> {
+        let array_buffer_str = JsValue::from_str("arrayBuffer");
+        let promises = Array::new();
+        for (_, blob) in self.attachments.iter() {
+            promises.push(&Reflect::get(blob.as_ref(), &array_buffer_str)?);
+        }
+        let arraybuffers: Array = JsFuture::from(Promise::all(promises.as_ref())).await?.unchecked_into();
+        let json = JSON::stringify(&self.data)?.as_string().unwrap();
+        let data: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        Ok(SerializedDocumentData {
+            id: self.id,
+            attachments: self.attachments.into_iter().zip(arraybuffers.iter()).map(|((name, _), arraybuffer)| {
+                (name, Uint8Array::new(arraybuffer.as_ref()).to_vec())
+            }).collect::<HashMap<String, Vec<u8>>>(),
+            data,
+        })
+    }
 
     pub(crate) fn new_deleted(id: &str, rev: JsValue) -> Self {
         Self {
@@ -153,4 +172,11 @@ impl TryFrom<JsValue> for SerializedDocument {
             deleted: false,
         })
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SerializedDocumentData {
+    id: String,
+    attachments: HashMap<String, Vec<u8>>,
+    data: serde_json::Value,
 }
