@@ -14,6 +14,12 @@ impl AsRef<JsValue> for Revision {
     }
 }
 
+impl From<JsValue> for Revision {
+    fn from(value: JsValue) -> Self {
+        Revision(value)
+    }
+}
+
 /// A document stored in the database. Everything serialized will be stored.
 ///
 /// Do *not* include the `id` and `rev` parameters in the json!
