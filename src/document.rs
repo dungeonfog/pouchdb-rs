@@ -29,8 +29,8 @@ pub trait Document {
     fn id(&self) -> String;
     /// The opaque revision id of this document.
     fn rev(&self) -> Option<&Revision>;
-    /// Serialize the document into a JSON string.
-    fn json(&self) -> String;
+    /// Serialize the document into a JSON-like object.
+    fn serialize(&self) -> Result<JsValue, JsValue>;
     /// Optionally, you can add binary attachments here.
     fn attachments(&self) -> HashMap<String, Blob> {
         HashMap::new()
@@ -51,7 +51,7 @@ where
         object.into()
     } else {
         let attachments = doc.attachments();
-        let doc = js_sys::JSON::parse(&doc.json())?;
+        let doc = doc.serialize()?;
         if !attachments.is_empty() {
             let root = Object::new();
             for (name, blob) in &attachments {
@@ -83,7 +83,7 @@ pub struct SerializedDocument {
     pub conflicts: Vec<Revision>,
     pub attachments: HashMap<String, web_sys::Blob>,
     pub deleted: bool,
-    data: JsValue,
+    pub data: JsValue,
 }
 
 impl SerializedDocument {
