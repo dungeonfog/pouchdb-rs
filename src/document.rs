@@ -1,10 +1,10 @@
-use js_sys::{JsString, Reflect, Object, Promise, Array, Uint8Array, JSON};
+use js_sys::{JsString, Reflect, Object, Promise, Array, Uint8Array, JSON, WebAssembly};
 use serde::{Serialize, Deserialize};
 use serde_json::error::Result as SerdeResult;
 use std::{collections::HashMap, convert::TryFrom};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::Blob;
+use web_sys::{Blob, BlobPropertyBag};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Revision(pub(crate) JsValue);
@@ -106,9 +106,9 @@ impl SerializedDocument {
 
         Ok(SerializedDocumentData {
             id: self.id,
-            attachments: self.attachments.into_iter().zip(arraybuffers.iter()).map(|((name, _), arraybuffer)| {
-                (name, Uint8Array::new(arraybuffer.as_ref()).to_vec())
-            }).collect::<HashMap<String, Vec<u8>>>(),
+            attachments: self.attachments.into_iter().zip(arraybuffers.iter()).map(|((name, blob), arraybuffer)| {
+                (name, (blob.type_(), Uint8Array::new(arraybuffer.as_ref()).to_vec()))
+            }).collect::<HashMap<String, (String, Vec<u8>)>>(),
             data,
         })
     }
@@ -174,9 +174,32 @@ impl TryFrom<JsValue> for SerializedDocument {
     }
 }
 
+/// Do *not* use for existing documents! Does not store a rev.
 #[derive(Serialize, Deserialize)]
 pub struct SerializedDocumentData {
-    id: String,
-    attachments: HashMap<String, Vec<u8>>,
-    data: serde_json::Value,
+    pub id: String,
+    pub attachments: HashMap<String, (String, Vec<u8>)>,
+    pub data: serde_json::Value,
+}
+
+impl Document for SerializedDocumentData {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
+    fn rev(&self) -> Option<&Revision> {
+        None
+    }
+    fn serialize(&self) -> Result<JsValue, JsValue> {
+        JsValue::from_serde(&self.data).map_err(|err| JsValue::from_str(&format!("{}", err)))
+    }
+    fn attachments(&self) -> HashMap<String, Blob> {
+        let memory_buffer = wasm_bindgen::memory().dyn_into::<WebAssembly::Memory>().unwrap().buffer();
+        self.attachments.iter().filter_map(|(name, (mime_type, binary))| {
+            let binary_location = binary.as_ptr() as u32;
+            let buffer = js_sys::Uint8Array::new(&memory_buffer).subarray(binary_location, binary_location + binary.len() as u32);
+            let mut options = BlobPropertyBag::new();
+            options.type_(&mime_type);
+            Blob::new_with_u8_array_sequence_and_options(&js_sys::Array::of1(buffer.as_ref()).into(), &options).ok().map(|blob| (name.clone(), blob))
+        }).collect()
+    }
 }
