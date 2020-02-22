@@ -95,11 +95,12 @@ extern "C" {
     ) -> Promise;
 
     #[wasm_bindgen(method, js_class = default, js_name = getAttachment)]
-    pub fn get_attachment(this: &PouchDB, attachment_id: JsValue) -> Promise;
+    pub fn get_attachment(this: &PouchDB, doc_id: JsValue, attachment_id: JsValue) -> Promise;
 
     #[wasm_bindgen(method, js_class = default, js_name = getAttachment)]
     pub fn get_attachment_with_options(
         this: &PouchDB,
+        doc_id: JsValue,
         attachment_id: JsValue,
         options: JsValue,
     ) -> Promise;

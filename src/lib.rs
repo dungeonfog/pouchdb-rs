@@ -4,7 +4,8 @@ use std::{
 };
 
 use js_sys::{Object, Reflect, Array};
-use wasm_bindgen::JsValue;
+use web_sys::Blob;
+use wasm_bindgen::{JsValue, JsCast};
 use wasm_bindgen_futures::JsFuture;
 
 mod pouchdb_sys;
@@ -23,7 +24,7 @@ use responses::*;
 pub mod error;
 use error::Error;
 pub mod document;
-use document::{Document, SerializedDocument};
+use document::{Document, SerializedDocument, Revision};
 pub mod events;
 use events::{
     SequenceID,
@@ -217,6 +218,18 @@ impl PouchDB {
                 None
             })
             .collect())
+    }
+
+    /// Get attachment data.
+    pub async fn get_attachment(&self, doc_id: &str, attachment_id: &str, rev: Option<&Revision>) -> Result<Blob, JsValue> {
+        let blob = if let Some(rev) = rev {
+            let options = Object::new();
+            Reflect::set(&options, &JsValue::from_str("rev"), rev.as_ref())?;
+            JsFuture::from(self.0.get_attachment_with_options(JsValue::from_str(doc_id), JsValue::from_str(attachment_id), options.unchecked_into())).await?
+        } else {
+            JsFuture::from(self.0.get_attachment(JsValue::from_str(doc_id), JsValue::from_str(attachment_id))).await?
+        };
+        Ok(blob.unchecked_into())
     }
 
     /// A list of changes made to documents in the database, in the order they were made. It
