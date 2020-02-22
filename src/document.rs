@@ -1,10 +1,10 @@
-use js_sys::{JsString, Reflect, Object, Promise, Array, Uint8Array, JSON, WebAssembly};
+use js_sys::{JsString, Reflect, Object, Promise, Array, Uint8Array, ArrayBuffer, JSON, WebAssembly};
 use serde::{Serialize, Deserialize};
 use serde_json::error::Result as SerdeResult;
 use std::{collections::HashMap, convert::TryFrom};
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{Blob, BlobPropertyBag};
+use web_sys::{Blob, BlobPropertyBag, FileReader};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Revision(pub(crate) JsValue);
@@ -78,36 +78,89 @@ where
 }
 
 #[derive(Debug, Clone)]
+pub enum Attachment {
+    Data {
+        blob: web_sys::Blob,
+        digest: String,
+    },
+    Stub {
+        content_type: String,
+        digest: String,
+    }
+}
+
+impl Attachment {
+    pub fn is_stub(&self) -> bool {
+        match self {
+            Self::Data { blob:_, digest:_ } => false,
+            Self::Stub { content_type:_, digest:_ } => true,
+        }
+    }
+}
+
+fn blob_to_arraybuffer(blob: &Blob) -> Promise {
+    Promise::new(&mut |resolve, reject| {
+        match FileReader::new() {
+            Ok(reader) => {
+                let inner_resolve = resolve.clone();
+                let inner_reject = reject.clone();
+                let inner_reader = reader.clone();
+                let converter = Closure::once(move || {
+                    match inner_reader.result().map(|buffer| buffer.unchecked_into()) {
+                        Ok(buffer) => inner_resolve.call1(&JsValue::NULL, &buffer),
+                        Err(err) => inner_reject.call1(&JsValue::NULL, &err),
+                    }
+                });
+                reader.set_onerror(Some(&reject));
+                reader.set_onloadend(Some(converter.as_ref().unchecked_ref()));
+                if let Err(err) = reader.read_as_array_buffer(blob) {
+                    reject.call1(&JsValue::NULL, &err).ok();
+                }
+            }
+            Err(err) => {
+                reject.call1(&JsValue::NULL, &err).ok();
+            }
+        }
+    })
+}
+
+#[derive(Debug, Clone)]
 pub struct SerializedDocument {
     pub id: String,
     pub rev: Option<Revision>,
     pub conflicts: Vec<Revision>,
-    pub attachments: HashMap<String, web_sys::Blob>,
+    pub attachments: HashMap<String, Attachment>,
     pub deleted: bool,
     pub data: JsValue,
 }
 
 impl SerializedDocument {
-    pub fn deserialize<T>(self) -> (String, Option<Revision>, SerdeResult<T>, HashMap<String, web_sys::Blob>)
+    pub fn deserialize<T>(self) -> (String, Option<Revision>, SerdeResult<T>, HashMap<String, Attachment>)
     where
         T: for<'a> Deserialize<'a>,
     {
         (self.id, self.rev, self.data.into_serde(), self.attachments)
     }
     pub async fn into_serialized(self) -> Result<SerializedDocumentData, crate::error::Error> {
-        let array_buffer_str = JsValue::from_str("arrayBuffer");
         let promises = Array::new();
-        for (_, blob) in self.attachments.iter() {
-            promises.push(&Reflect::get(blob.as_ref(), &array_buffer_str)?);
+        for (_, attachment) in self.attachments.iter() {
+            if let Attachment::Data { blob, digest:_ } = attachment {
+                promises.push(&blob_to_arraybuffer(blob));
+            }
         }
         let arraybuffers: Array = JsFuture::from(Promise::all(promises.as_ref())).await?.unchecked_into();
+
         let json = JSON::stringify(&self.data)?.as_string().unwrap();
         let data: serde_json::Value = serde_json::from_str(&json).unwrap();
 
         Ok(SerializedDocumentData {
             id: self.id,
-            attachments: self.attachments.into_iter().zip(arraybuffers.iter()).map(|((name, blob), arraybuffer)| {
-                (name, (blob.type_(), Uint8Array::new(arraybuffer.as_ref()).to_vec()))
+            attachments: self.attachments.into_iter().filter(|(_, attachment)| !attachment.is_stub()).zip(arraybuffers.iter()).map(|((name, attachment), arraybuffer)| {
+                if let Attachment::Data { blob, digest:_ } = attachment {
+                    (name, (blob.type_(), Uint8Array::new(arraybuffer.as_ref()).to_vec()))
+                } else {
+                    panic!()
+                }
             }).collect::<HashMap<String, (String, Vec<u8>)>>(),
             data,
         })
@@ -150,10 +203,23 @@ impl TryFrom<JsValue> for SerializedDocument {
                     .iter()
                     .filter_map(|name| {
                         if let Ok(object) = Reflect::get(&attachments, &name) {
-                            if let Some(name) = name.as_string() {
-                                if let Ok(data) = Reflect::get(&object, &JsValue::from_str("data"))
-                                {
-                                    return Some((name, data.into()));
+                            if let (Some(name), Some(digest)) = (name.as_string(), Reflect::get(&object, &JsValue::from_str("digest")).ok().filter(|digest| digest.is_truthy()).and_then(|digest| digest.as_string())) {
+                                if Reflect::get(&object, &JsValue::from_str("stub")).map(|stub| stub.is_truthy()).unwrap_or(false) {
+                                    if let Some(result) = Reflect::get(&object, &JsValue::from_str("content_type")).ok().filter(|ct| ct.is_truthy()).and_then(|ct| ct.as_string()).map(|content_type| {
+                                        (name, Attachment::Stub {
+                                            digest,
+                                            content_type,
+                                        })
+                                    }) {
+                                        return Some(result);
+                                    }
+                                } else {
+                                    if let Ok(data) = Reflect::get(&object, &JsValue::from_str("data")) {
+                                        return Some((name, Attachment::Data {
+                                            blob: data.into(),
+                                            digest,
+                                        }));
+                                    }
                                 }
                             }
                         }
