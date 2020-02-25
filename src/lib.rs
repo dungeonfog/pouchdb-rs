@@ -195,7 +195,6 @@ impl PouchDB {
                                 if let Some(rev) = Reflect::get(&value, &JsValue::from_str("rev"))
                                     .ok()
                                     .filter(|value| !value.is_undefined())
-                                    .map(|rev| rev.into())
                                 {
                                     if let Some(id) = Reflect::get(&row, &JsValue::from_str("id"))
                                         .ok()

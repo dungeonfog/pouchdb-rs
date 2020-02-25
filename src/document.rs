@@ -1,4 +1,4 @@
-use js_sys::{JsString, Reflect, Object, Promise, Array, Uint8Array, ArrayBuffer, JSON, WebAssembly};
+use js_sys::{JsString, Reflect, Object, Promise, Array, Uint8Array, JSON, WebAssembly};
 use serde::{Serialize, Deserialize};
 use serde_json::error::Result as SerdeResult;
 use std::{collections::HashMap, convert::TryFrom};
@@ -74,7 +74,7 @@ where
         Reflect::set(&object, &JsValue::from_str("_rev"), &rev.0)?;
     }
 
-    Ok(object.into())
+    Ok(object)
 }
 
 #[derive(Debug, Clone)]
@@ -92,8 +92,8 @@ pub enum Attachment {
 impl Attachment {
     pub fn is_stub(&self) -> bool {
         match self {
-            Self::Data { blob:_, digest:_ } => false,
-            Self::Stub { content_type:_, digest:_ } => true,
+            Self::Data { .. } => false,
+            Self::Stub { .. } => true,
         }
     }
 }
@@ -102,12 +102,11 @@ fn blob_to_arraybuffer(blob: &Blob) -> Promise {
     Promise::new(&mut |resolve, reject| {
         match FileReader::new() {
             Ok(reader) => {
-                let inner_resolve = resolve.clone();
                 let inner_reject = reject.clone();
                 let inner_reader = reader.clone();
                 let converter = Closure::once(move || {
                     match inner_reader.result().map(|buffer| buffer.unchecked_into()) {
-                        Ok(buffer) => inner_resolve.call1(&JsValue::NULL, &buffer),
+                        Ok(buffer) => resolve.call1(&JsValue::NULL, &buffer),
                         Err(err) => inner_reject.call1(&JsValue::NULL, &err),
                     }
                 });
@@ -144,7 +143,7 @@ impl SerializedDocument {
     pub async fn into_serialized(self) -> Result<SerializedDocumentData, crate::error::Error> {
         let promises = Array::new();
         for (_, attachment) in self.attachments.iter() {
-            if let Attachment::Data { blob, digest:_ } = attachment {
+            if let Attachment::Data { blob, .. } = attachment {
                 promises.push(&blob_to_arraybuffer(blob));
             }
         }
@@ -156,7 +155,7 @@ impl SerializedDocument {
         Ok(SerializedDocumentData {
             id: self.id,
             attachments: self.attachments.into_iter().filter(|(_, attachment)| !attachment.is_stub()).zip(arraybuffers.iter()).map(|((name, attachment), arraybuffer)| {
-                if let Attachment::Data { blob, digest:_ } = attachment {
+                if let Attachment::Data { blob, .. } = attachment {
                     (name, (blob.type_(), Uint8Array::new(arraybuffer.as_ref()).to_vec()))
                 } else {
                     panic!()
@@ -188,12 +187,12 @@ impl TryFrom<JsValue> for SerializedDocument {
             .ok_or_else(|| JsValue::from_str("Document id is not a string."))?;
         let rev = Reflect::get(&data, &JsValue::from_str("_rev"))
             .ok()
-            .map(|rev| Revision(rev));
+            .map(Revision);
         let conflicts = Reflect::get(&data, &JsValue::from_str("_conflicts"))
             .map(|conflicts| {
                 <js_sys::Array as std::convert::From<JsValue>>::from(conflicts)
                     .iter()
-                    .map(|conflict| Revision(conflict.into()))
+                    .map(Revision)
                     .collect()
             })
             .unwrap_or_else(|_| Vec::new());
@@ -213,13 +212,11 @@ impl TryFrom<JsValue> for SerializedDocument {
                                     }) {
                                         return Some(result);
                                     }
-                                } else {
-                                    if let Ok(data) = Reflect::get(&object, &JsValue::from_str("data")) {
-                                        return Some((name, Attachment::Data {
-                                            blob: data.into(),
-                                            digest,
-                                        }));
-                                    }
+                                } else if let Ok(data) = Reflect::get(&object, &JsValue::from_str("data")) {
+                                    return Some((name, Attachment::Data {
+                                        blob: data.into(),
+                                        digest,
+                                    }));
                                 }
                             }
                         }

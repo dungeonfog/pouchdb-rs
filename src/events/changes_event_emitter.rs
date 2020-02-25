@@ -19,9 +19,9 @@ impl ChangeEvent {
             if let Some(changes) = Reflect::get(&info, &JsValue::from_str("changes")).ok().filter(|value| Array::is_array(&value)) {
                 let rev = JsValue::from_str("rev");
                 let changes: Vec<Revision> = Array::from(&changes).iter().filter_map(|change| {
-                    Reflect::get(&change, &rev).ok().map(|rev| Revision(rev))
+                    Reflect::get(&change, &rev).ok().map(Revision)
                 }).collect();
-                if let Some(seq) = Reflect::get(&info, &JsValue::from_str("seq")).ok().map(|seq| SequenceID(seq)) {
+                if let Some(seq) = Reflect::get(&info, &JsValue::from_str("seq")).ok().map(SequenceID) {
                     if let Some(_deleted) = Reflect::get(&info, &JsValue::from_str("deleted")).ok().map(|b| b.is_truthy()) {
                         return Ok(ChangeEvent {
                             id, changes, seq,
