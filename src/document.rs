@@ -21,6 +21,18 @@ impl From<JsValue> for Revision {
     }
 }
 
+impl Into<String> for Revision {
+    fn into(self) -> String {
+        self.0.as_string().unwrap()
+    }
+}
+
+impl From<&str> for Revision {
+    fn from(s: &str) -> Self {
+        Self(JsValue::from_str(s))
+    }
+}
+
 /// A document stored in the database. Everything serialized will be stored.
 ///
 /// Do *not* include the `id` and `rev` parameters in the json!
