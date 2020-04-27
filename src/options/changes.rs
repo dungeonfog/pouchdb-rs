@@ -44,10 +44,10 @@ pub struct Changes {
     pub include_docs: bool,
     /// Include conflicts.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub include_conflicts: bool,
+    pub conflicts: bool,
     /// Include attachments.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub include_attachments: bool,
+    pub attachments: bool,
     /// Reverse the order of the output documents.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub descending: bool,
