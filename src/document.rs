@@ -200,14 +200,14 @@ impl TryFrom<JsValue> for SerializedDocument {
         let rev = Reflect::get(&data, &JsValue::from_str("_rev"))
             .ok()
             .map(Revision);
-        let conflicts = Reflect::get(&data, &JsValue::from_str("_conflicts"))
+        let conflicts = Reflect::get(&data, &JsValue::from_str("_conflicts")).ok().filter(|conflicts| conflicts.is_truthy())
             .map(|conflicts| {
                 <js_sys::Array as std::convert::From<JsValue>>::from(conflicts)
                     .iter()
                     .map(Revision)
                     .collect()
             })
-            .unwrap_or_else(|_| Vec::new());
+            .unwrap_or_else(|| Vec::new());
         let attachments = Reflect::get(&data, &JsValue::from_str("_attachments"))
             .and_then(|attachments| {
                 Ok(Reflect::own_keys(&attachments)?
