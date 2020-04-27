@@ -262,6 +262,7 @@ impl PouchDB {
             }
         }
         Reflect::set(&js_options, &JsValue::from_str("live"), &JsValue::TRUE)?;
+        Reflect::set(&js_options, &JsValue::from_str("binary"), &JsValue::TRUE)?;
         Ok(ChangesEventEmitter::new(self.0.changes(js_options)))
     }
 
