@@ -22,7 +22,7 @@ impl ChangeEvent {
                     Reflect::get(&change, &rev).ok().map(Revision)
                 }).collect();
                 if let Some(seq) = Reflect::get(&info, &JsValue::from_str("seq")).ok().map(SequenceID) {
-                    if let Some(_deleted) = Reflect::get(&info, &JsValue::from_str("deleted")).ok().map(|b| b.is_truthy()) {
+                    if Some(true) == Reflect::get(&info, &JsValue::from_str("deleted")).ok().map(|b| b.is_truthy()) {
                         return Ok(ChangeEvent {
                             id, changes, seq,
                             deleted: true,
