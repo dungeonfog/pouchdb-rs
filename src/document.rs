@@ -249,6 +249,27 @@ impl TryFrom<JsValue> for SerializedDocument {
     }
 }
 
+impl Document for SerializedDocument {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
+    fn rev(&self) -> Option<&Revision> {
+        self.rev.as_ref()
+    }
+    fn serialize(&self) -> Result<JsValue, JsValue> {
+        Ok(self.data.clone())
+    }
+    fn attachments(&self) -> HashMap<String, Blob> {
+        self.attachments.iter().filter_map(|(name, attachment)| {
+            if let Attachment::Data { blob, .. } = attachment {
+                Some((name.clone(), blob.clone()))
+            } else {
+                None
+            }
+        }).collect()
+    }
+}
+
 /// Do *not* use for existing documents! Does not store a rev.
 #[derive(Serialize, Deserialize)]
 pub struct SerializedDocumentData {
