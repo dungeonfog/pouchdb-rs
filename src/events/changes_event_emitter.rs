@@ -5,6 +5,7 @@ use js_sys::{Function, Reflect, Array};
 use super::{EventEmitter, EventName, EventListener, SequenceID};
 use crate::document::{SerializedDocument, Revision};
 
+#[derive(Debug)]
 pub struct ChangeEvent {
     pub id: String,
     pub changes: Vec<Revision>,

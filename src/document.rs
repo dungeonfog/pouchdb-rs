@@ -6,7 +6,7 @@ use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Blob, BlobPropertyBag, FileReader};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Revision(pub(crate) JsValue);
 
 impl AsRef<JsValue> for Revision {
@@ -30,6 +30,14 @@ impl Into<String> for Revision {
 impl From<&str> for Revision {
     fn from(s: &str) -> Self {
         Self(JsValue::from_str(s))
+    }
+}
+
+impl std::fmt::Debug for Revision {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Revision")
+         .field(&self.0.as_string().unwrap())
+         .finish()
     }
 }
 
