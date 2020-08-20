@@ -1,22 +1,19 @@
 use std::{
-    convert::{TryFrom, TryInto, AsRef},
+    convert::{AsRef, TryFrom, TryInto},
     ops::Deref,
 };
 
-use js_sys::{Object, Reflect, Array};
-use web_sys::Blob;
-use wasm_bindgen::{JsValue, JsCast};
+use js_sys::{Array, Object, Reflect};
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
+use web_sys::Blob;
 
 mod pouchdb_sys;
 use pouchdb_sys::PouchDB as JsPouchDB;
 
 pub mod options;
 use options::{
-    all_docs::AllDocsOptions,
-    changes::Changes,
-    create::CreateOptions,
-    fetch::FetchOptions,
+    all_docs::AllDocsOptions, changes::Changes, create::CreateOptions, fetch::FetchOptions,
     replication::Replication,
 };
 pub mod responses;
@@ -24,12 +21,12 @@ use responses::*;
 pub mod error;
 use error::Error;
 pub mod document;
-use document::{Document, SerializedDocument, Revision};
+use document::{Document, Revision, SerializedDocument};
 pub mod events;
 use events::{
+    changes_event_emitter::{ChangeEvent, ChangesEventEmitter},
+    replication_event_emitter::ReplicationEventEmitter,
     SequenceID,
-    changes_event_emitter::{ChangesEventEmitter, ChangeEvent},
-    replication_event_emitter::{ReplicationEventEmitter},
 };
 
 pub enum PouchDBOrStringRef<'a> {
@@ -118,8 +115,7 @@ impl PouchDB {
         &self,
         doc_id: &str,
         options: &FetchOptions,
-    ) -> Result<SerializedDocument, Error>
-    {
+    ) -> Result<SerializedDocument, Error> {
         JsFuture::from(
             self.0
                 .get_with_options(JsValue::from_str(doc_id), JsValue::from_serde(options)?),
@@ -150,8 +146,7 @@ impl PouchDB {
         )?;
         Reflect::set(&value, &JsValue::from_str("_deleted"), &JsValue::TRUE)?;
 
-        JsFuture::from(self.0.put(value.into()))
-            .await?.try_into()
+        JsFuture::from(self.0.put(value.into())).await?.try_into()
     }
 
     /// Create/update a batch of documents
@@ -190,19 +185,20 @@ impl PouchDB {
                         .ok()
                         .filter(|value| !value.is_undefined())
                     {
-                        if let Ok(deleted) = Reflect::get(&value, &JsValue::from_str("deleted")) {
-                            if deleted.is_truthy() {
-                                if let Some(rev) = Reflect::get(&value, &JsValue::from_str("rev"))
+                        if Reflect::get(&value, &JsValue::from_str("deleted"))
+                            .map(|deleted| deleted.is_truthy())
+                            .unwrap_or(false)
+                        {
+                            if let Some(rev) = Reflect::get(&value, &JsValue::from_str("rev"))
+                                .ok()
+                                .filter(|value| !value.is_undefined())
+                            {
+                                if let Some(id) = Reflect::get(&row, &JsValue::from_str("id"))
                                     .ok()
                                     .filter(|value| !value.is_undefined())
                                 {
-                                    if let Some(id) = Reflect::get(&row, &JsValue::from_str("id"))
-                                        .ok()
-                                        .filter(|value| !value.is_undefined())
-                                    {
-                                        if let Some(id) = id.as_string() {
-                                            return Some(SerializedDocument::new_deleted(&id, rev));
-                                        }
+                                    if let Some(id) = id.as_string() {
+                                        return Some(SerializedDocument::new_deleted(&id, rev));
                                     }
                                 }
                             }
@@ -220,13 +216,27 @@ impl PouchDB {
     }
 
     /// Get attachment data.
-    pub async fn get_attachment(&self, doc_id: &str, attachment_id: &str, rev: Option<&Revision>) -> Result<Blob, JsValue> {
+    pub async fn get_attachment(
+        &self,
+        doc_id: &str,
+        attachment_id: &str,
+        rev: Option<&Revision>,
+    ) -> Result<Blob, JsValue> {
         let blob = if let Some(rev) = rev {
             let options = Object::new();
             Reflect::set(&options, &JsValue::from_str("rev"), rev.as_ref())?;
-            JsFuture::from(self.0.get_attachment_with_options(JsValue::from_str(doc_id), JsValue::from_str(attachment_id), options.unchecked_into())).await?
+            JsFuture::from(self.0.get_attachment_with_options(
+                JsValue::from_str(doc_id),
+                JsValue::from_str(attachment_id),
+                options.unchecked_into(),
+            ))
+            .await?
         } else {
-            JsFuture::from(self.0.get_attachment(JsValue::from_str(doc_id), JsValue::from_str(attachment_id))).await?
+            JsFuture::from(
+                self.0
+                    .get_attachment(JsValue::from_str(doc_id), JsValue::from_str(attachment_id)),
+            )
+            .await?
         };
         Ok(blob.unchecked_into())
     }
@@ -234,11 +244,11 @@ impl PouchDB {
     /// A list of changes made to documents in the database, in the order they were made. It
     /// returns a struct with the function `cancel`, which you call if you don’t want to listen
     /// to new changes anymore.
-    /// 
+    ///
     /// It is an [EventEmitter] and will emit a `change` event on each document change, a
     /// `complete` event when all the changes have been processed, and an `error` event when an
     /// error occurs. Calling `cancel` will unsubscribe all event listeners automatically.
-    /// 
+    ///
     /// Change events
     /// - `change` (`info`) - This event fires when a change has been found. `info` will contain
     ///     details about the change, such as whether it was deleted and what the new `_rev` is.
@@ -268,7 +278,10 @@ impl PouchDB {
 
     /// If you use [changes_oneshot] instead of [changes], it will be treated as a
     /// single-shot request, which asynchronously returns a list of the changes and the `last_seq`.
-    pub async fn changes_oneshot(&self, options: &Changes) -> Result<(Vec<ChangeEvent>, SequenceID), Error> {
+    pub async fn changes_oneshot(
+        &self,
+        options: &Changes,
+    ) -> Result<(Vec<ChangeEvent>, SequenceID), Error> {
         let js_options = JsValue::from_serde(options)?;
         if let Some(query_params) = &options.query_params {
             if let (Some(js_options), Some(query_params)) = (
@@ -282,9 +295,19 @@ impl PouchDB {
             }
         }
         let info = JsFuture::from(self.0.changes_oneshot(js_options)).await?;
-        if let Some(results) = Reflect::get(&info, &JsValue::from_str("results")).ok().filter(|results| Array::is_array(&results)) {
-            if let Some(last_seq) = Reflect::get(&info, &JsValue::from_str("last_seq")).ok().filter(|last_seq| !last_seq.is_undefined()) {
-                Array::from(&results).iter().map(|result| ChangeEvent::new(&result).map_err(|err| err.into())).collect::<Result<Vec<ChangeEvent>, Error>>().map(|results| (results, SequenceID(last_seq)))
+        if let Some(results) = Reflect::get(&info, &JsValue::from_str("results"))
+            .ok()
+            .filter(|results| Array::is_array(&results))
+        {
+            if let Some(last_seq) = Reflect::get(&info, &JsValue::from_str("last_seq"))
+                .ok()
+                .filter(|last_seq| !last_seq.is_undefined())
+            {
+                Array::from(&results)
+                    .iter()
+                    .map(|result| ChangeEvent::new(&result).map_err(|err| err.into()))
+                    .collect::<Result<Vec<ChangeEvent>, Error>>()
+                    .map(|results| (results, SequenceID(last_seq)))
             } else {
                 Err(JsValue::from_str("Failed reading last_seq!").into())
             }
@@ -297,18 +320,18 @@ impl PouchDB {
     /// PouchDB instance or a string representing a CouchDB database URL or the name of a
     /// local PouchDB database. This call will track future changes and also replicate
     /// them automatically.
-    /// 
+    ///
     /// If `retry` == true will attempt to retry replications in the case of failure (due
     /// to being offline), using a backoff algorithm that retries at longer and longer
     /// intervals until a connection is re-established, with a maximum delay of 10 minutes.
-    /// 
+    ///
     /// This method returns an object with the method
     /// [ReplicationEventEmitter::cancel], which you call if you want to cancel live
     /// replication.
-    /// 
+    ///
     /// Replication is an event emitter like [changes] and emits the `complete`, `active`,
     /// `paused`, `change`, `denied` and `error` events.
-    /// 
+    ///
     /// Note that replication is supported for both local and remote databases. So you
     /// can replicate from local to local or from remote to remote.
     ///
@@ -316,7 +339,12 @@ impl PouchDB {
     /// through PouchDB. If you want to trigger a server-initiated replication, please
     /// use regular ajax to POST to the CouchDB `_replicate` endpoint, as described in
     /// the CouchDB docs.
-    pub fn replicate(source: PouchDBOrStringRef, target: PouchDBOrStringRef, options: &Replication, retry: bool) -> Result<ReplicationEventEmitter, Error> {
+    pub fn replicate(
+        source: PouchDBOrStringRef,
+        target: PouchDBOrStringRef,
+        options: &Replication,
+        retry: bool,
+    ) -> Result<ReplicationEventEmitter, Error> {
         let js_options = JsValue::from_serde(options)?;
         if let Some(query_params) = &options.query_params {
             if let (Some(js_options), Some(query_params)) = (
@@ -339,24 +367,32 @@ impl PouchDB {
         let target_string;
 
         let source = match source {
-            PouchDBOrStringRef::PouchDB(db) => <JsPouchDB as AsRef<wasm_bindgen::JsValue>>::as_ref(&db.0),
+            PouchDBOrStringRef::PouchDB(db) => {
+                <JsPouchDB as AsRef<wasm_bindgen::JsValue>>::as_ref(&db.0)
+            }
             PouchDBOrStringRef::String(s) => {
                 source_string = JsValue::from_str(s);
                 &source_string
-            },
+            }
         };
         let target = match target {
             PouchDBOrStringRef::PouchDB(db) => db.0.as_ref(),
             PouchDBOrStringRef::String(s) => {
                 target_string = JsValue::from_str(s);
                 &target_string
-            },
+            }
         };
 
-        Ok(ReplicationEventEmitter::new(JsPouchDB::replicate_with_options(source, target, js_options)))
+        Ok(ReplicationEventEmitter::new(
+            JsPouchDB::replicate_with_options(source, target, js_options),
+        ))
     }
 
-    pub async fn replicate_oneshot<'a>(_source: PouchDBOrStringRef<'a>, _target: PouchDBOrStringRef<'a>, _options: &Replication) -> Result<(), Error> {
+    pub async fn replicate_oneshot<'a>(
+        _source: PouchDBOrStringRef<'a>,
+        _target: PouchDBOrStringRef<'a>,
+        _options: &Replication,
+    ) -> Result<(), Error> {
         Ok(())
     }
 
@@ -368,7 +404,10 @@ impl PouchDB {
 
 impl std::fmt::Debug for PouchDB {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        if let Some(name) = Reflect::get(&self.0, &JsValue::from_str("name")).ok().and_then(|name| name.as_string()) {
+        if let Some(name) = Reflect::get(&self.0, &JsValue::from_str("name"))
+            .ok()
+            .and_then(|name| name.as_string())
+        {
             write!(f, "PouchDB {}", name)
         } else {
             write!(f, "PouchDB with unknown name")
