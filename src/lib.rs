@@ -1,7 +1,4 @@
-use std::{
-    convert::{AsRef, TryFrom, TryInto},
-    ops::Deref,
-};
+use std::convert::{AsRef, TryFrom, TryInto};
 
 use js_sys::{Array, Object, Reflect};
 use wasm_bindgen::{JsCast, JsValue};
