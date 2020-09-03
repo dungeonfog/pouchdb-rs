@@ -151,13 +151,13 @@ impl PouchDB {
 
     /// Create/update a batch of documents
     // pub fn bulk_docs<I: IntoIterator<Item = Box<dyn Serialize>>>(&self, docs: I) -> Result<ChangeResponse, Error> {
-    pub async fn bulk_docs<I: IntoIterator<Item = Box<dyn Document>>>(
+    pub async fn bulk_docs<D: Document, I: IntoIterator<Item = D>>(
         &self,
         docs: I,
     ) -> Result<ChangeResponse, Error> {
         let array = js_sys::Array::new();
         for doc in docs {
-            let object = document::serialize(doc.deref())?;
+            let object = document::serialize(&doc)?;
             array.push(&object);
         }
         JsFuture::from(self.0.bulk_docs(array.into()))
