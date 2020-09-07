@@ -114,6 +114,7 @@ impl PouchDB {
         options: &FetchOptions,
     ) -> Result<SerializedDocument, Error> {
         let attachments = options.attachments;
+        let has_revs = matches!(options.open_revs, options::fetch::OpenRevs::Revs(_));
         let options = JsValue::from_serde(options)?;
         if attachments {
             Reflect::set(&options, &JsValue::from_str("binary"), &JsValue::TRUE)?;
@@ -122,10 +123,14 @@ impl PouchDB {
         JsFuture::from(self.0.get_with_options(JsValue::from_str(doc_id), options))
             .await
             .and_then(|data| {
-                let array: Array = data.dyn_into()?;
-                let entry = array.get(0);
-                let data = Reflect::get(&entry, &JsValue::from_str("ok"))?;
-                Ok(data)
+                if has_revs {
+                    let array: Array = data.dyn_into()?;
+                    let entry = array.get(0);
+                    let data = Reflect::get(&entry, &JsValue::from_str("ok"))?;
+                    Ok(data)
+                } else {
+                    Ok(data)
+                }
             })?
             .try_into()
             .map_err(Error::from)
