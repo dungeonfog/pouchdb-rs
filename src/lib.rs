@@ -113,13 +113,22 @@ impl PouchDB {
         doc_id: &str,
         options: &FetchOptions,
     ) -> Result<SerializedDocument, Error> {
-        JsFuture::from(
-            self.0
-                .get_with_options(JsValue::from_str(doc_id), JsValue::from_serde(options)?),
-        )
-        .await?
-        .try_into()
-        .map_err(Error::from)
+        let attachments = options.attachments;
+        let options = JsValue::from_serde(options)?;
+        if attachments {
+            Reflect::set(&options, &JsValue::from_str("binary"), &JsValue::TRUE)?;
+        }
+
+        JsFuture::from(self.0.get_with_options(JsValue::from_str(doc_id), options))
+            .await
+            .and_then(|data| {
+                let array: Array = data.dyn_into()?;
+                let entry = array.get(0);
+                let data = Reflect::get(&entry, &JsValue::from_str("ok"))?;
+                Ok(data)
+            })?
+            .try_into()
+            .map_err(Error::from)
     }
 
     /// Delete a document

@@ -47,8 +47,6 @@ pub struct FetchOptions {
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub attachments: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub binary: bool,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub latest: bool,
 }
 
@@ -82,9 +80,6 @@ impl FetchOptions {
             attachments,
             ..self
         }
-    }
-    pub fn binary(self, binary: bool) -> Self {
-        Self { binary, ..self }
     }
     pub fn latest(self, latest: bool) -> Self {
         Self { latest, ..self }
