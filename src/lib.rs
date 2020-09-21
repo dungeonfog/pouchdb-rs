@@ -161,19 +161,19 @@ impl PouchDB {
     }
 
     /// Create/update a batch of documents
-    // pub fn bulk_docs<I: IntoIterator<Item = Box<dyn Serialize>>>(&self, docs: I) -> Result<ChangeResponse, Error> {
     pub async fn bulk_docs<D: Document, I: IntoIterator<Item = D>>(
         &self,
         docs: I,
-    ) -> Result<ChangeResponse, Error> {
+    ) -> Result<Vec<ChangeResponse>, Error> {
         let array = js_sys::Array::new();
         for doc in docs {
             let object = document::serialize(&doc)?;
             array.push(&object);
         }
-        JsFuture::from(self.0.bulk_docs(array.into()))
-            .await?
-            .try_into()
+        let response: Array = JsFuture::from(self.0.bulk_docs(array.into()))
+            .await?.dyn_into()?;
+
+        response.iter().map(|doc: JsValue| doc.try_into()).collect()
     }
 
     /// Fetch multiple documents, indexed and sorted by the id. Deleted documents are only included
