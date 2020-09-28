@@ -1,7 +1,7 @@
-use wasm_bindgen::JsValue;
-use js_sys::{Function, Reflect};
-use super::{EventEmitter, EventName, EventListener, SequenceID};
+use super::{EventEmitter, EventListener, EventName, SequenceID};
 use crate::document::SerializedDocument;
+use js_sys::{Function, Reflect};
+use wasm_bindgen::JsValue;
 
 #[derive(Debug)]
 pub struct ChangeEvent {
@@ -47,25 +47,27 @@ impl ReplicationEventEmitter {
     /// will contain details about the change.
     pub fn add_change_listener(
         &self,
-        listener: impl Fn(ChangeEvent) + 'static
+        listener: impl Fn(ChangeEvent) + 'static,
     ) -> Result<EventListener, JsValue> {
-        self.0.add_listener(&EventName::string("change"), move |info| {
-            if let Ok(event) = ChangeEvent::new(&info) {
-                listener(event);
-            }
-        })
+        self.0
+            .add_listener(&EventName::string("change"), move |info| {
+                if let Ok(event) = ChangeEvent::new(&info) {
+                    listener(event);
+                }
+            })
     }
 
     /// This event fires when replication is completed or cancelled. In a live
     /// replication, only cancelling the replication should trigger this event. The
-    /// parameter will contain details about the replication. 
+    /// parameter will contain details about the replication.
     pub fn add_complete_listener(
         &self,
-        listener: impl Fn() + 'static // TODO: FnOnce
+        listener: impl Fn() + 'static, // TODO: FnOnce
     ) -> Result<EventListener, JsValue> {
-        self.0.add_listener(&EventName::string("complete"), move |_info| {
-            listener();
-        })
+        self.0
+            .add_listener(&EventName::string("complete"), move |_info| {
+                listener();
+            })
     }
 
     /// This event fires when the replication is paused, either because a live
@@ -73,18 +75,19 @@ impl ReplicationEventEmitter {
     /// with an error passed as the parameter, and is attempting to resume.
     pub fn add_paused_listener(
         &self,
-        listener: impl Fn(JsValue) + 'static
+        listener: impl Fn(JsValue) + 'static,
     ) -> Result<EventListener, JsValue> {
-        self.0.add_listener(&EventName::string("paused"), move |err| {
-            listener(err);
-        })
+        self.0
+            .add_listener(&EventName::string("paused"), move |err| {
+                listener(err);
+            })
     }
 
     /// This event fires when the replication starts actively processing changes;
     /// e.g. when it recovers from an error or new changes are available.
     pub fn add_active_listener(
         &self,
-        listener: impl Fn() + 'static
+        listener: impl Fn() + 'static,
     ) -> Result<EventListener, JsValue> {
         self.0.add_listener(&EventName::string("active"), move |_| {
             listener();
@@ -95,11 +98,12 @@ impl ReplicationEventEmitter {
     /// authorization errors.
     pub fn add_denied_listener(
         &self,
-        listener: impl Fn(JsValue) + 'static // TODO: FnOnce
+        listener: impl Fn(JsValue) + 'static, // TODO: FnOnce
     ) -> Result<EventListener, JsValue> {
-        self.0.add_listener(&EventName::string("denied"), move |err| {
-            listener(err);
-        })
+        self.0
+            .add_listener(&EventName::string("denied"), move |err| {
+                listener(err);
+            })
     }
 
     /// This event is fired when the replication is stopped due to an unrecoverable
@@ -108,12 +112,11 @@ impl ReplicationEventEmitter {
     /// want).
     pub fn add_error_listener(
         &self,
-        listener: impl Fn(JsValue) + 'static // TODO: FnOnce
+        listener: impl Fn(JsValue) + 'static, // TODO: FnOnce
     ) -> Result<EventListener, JsValue> {
-        self.0.add_listener(&EventName::string("error"), move |err| {
-            listener(err);
-        })
+        self.0
+            .add_listener(&EventName::string("error"), move |err| {
+                listener(err);
+            })
     }
-
-
 }

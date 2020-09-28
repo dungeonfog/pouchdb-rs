@@ -1,6 +1,6 @@
 use serde_json::Error as SerdeError;
-use wasm_bindgen::JsValue;
 use std::fmt::Debug;
+use wasm_bindgen::JsValue;
 
 #[derive(Debug)]
 pub enum Error {

@@ -1,10 +1,7 @@
 use serde::Serialize;
 use wasm_bindgen::JsValue;
 
-use super::{
-    selector::Selector,
-    changes::Timeout,
-};
+use super::{changes::Timeout, selector::Selector};
 use crate::events::SequenceID;
 
 #[derive(Serialize, Default, Debug)]

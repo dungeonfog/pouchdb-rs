@@ -11,11 +11,7 @@ pub enum OpenRevs {
 }
 impl OpenRevs {
     pub fn is_default(&self) -> bool {
-        if let OpenRevs::Default = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, OpenRevs::Default)
     }
     fn serialize_all<S: serde::Serializer>(s: S) -> Result<S::Ok, S::Error> {
         s.serialize_str("all")

@@ -171,7 +171,8 @@ impl PouchDB {
             array.push(&object);
         }
         let response: Array = JsFuture::from(self.0.bulk_docs(array.into()))
-            .await?.dyn_into()?;
+            .await?
+            .dyn_into()?;
 
         response.iter().map(|doc: JsValue| doc.try_into()).collect()
     }

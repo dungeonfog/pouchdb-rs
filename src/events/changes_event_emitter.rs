@@ -1,9 +1,9 @@
+use js_sys::{Array, Function, Reflect};
 use std::convert::TryFrom;
 use wasm_bindgen::JsValue;
-use js_sys::{Function, Reflect, Array};
 
-use super::{EventEmitter, EventName, EventListener, SequenceID};
-use crate::document::{SerializedDocument, Revision};
+use super::{EventEmitter, EventListener, EventName, SequenceID};
+use crate::document::{Revision, SerializedDocument};
 
 #[derive(Debug)]
 pub struct ChangeEvent {
@@ -16,27 +16,50 @@ pub struct ChangeEvent {
 
 impl ChangeEvent {
     pub(crate) fn new(info: &JsValue) -> Result<Self, JsValue> {
-        if let Some(id) = Reflect::get(&info, &JsValue::from_str("id")).ok().filter(|value| !value.is_undefined()).and_then(|id| id.as_string()) {
-            if let Some(changes) = Reflect::get(&info, &JsValue::from_str("changes")).ok().filter(|value| Array::is_array(&value)) {
+        if let Some(id) = Reflect::get(&info, &JsValue::from_str("id"))
+            .ok()
+            .filter(|value| !value.is_undefined())
+            .and_then(|id| id.as_string())
+        {
+            if let Some(changes) = Reflect::get(&info, &JsValue::from_str("changes"))
+                .ok()
+                .filter(|value| Array::is_array(&value))
+            {
                 let rev = JsValue::from_str("rev");
-                let changes: Vec<Revision> = Array::from(&changes).iter().filter_map(|change| {
-                    Reflect::get(&change, &rev).ok().map(Revision)
-                }).collect();
-                if let Some(seq) = Reflect::get(&info, &JsValue::from_str("seq")).ok().map(SequenceID) {
-                    if Some(true) == Reflect::get(&info, &JsValue::from_str("deleted")).ok().map(|b| b.is_truthy()) {
+                let changes: Vec<Revision> = Array::from(&changes)
+                    .iter()
+                    .filter_map(|change| Reflect::get(&change, &rev).ok().map(Revision))
+                    .collect();
+                if let Some(seq) = Reflect::get(&info, &JsValue::from_str("seq"))
+                    .ok()
+                    .map(SequenceID)
+                {
+                    if Some(true)
+                        == Reflect::get(&info, &JsValue::from_str("deleted"))
+                            .ok()
+                            .map(|b| b.is_truthy())
+                    {
                         return Ok(ChangeEvent {
-                            id, changes, seq,
+                            id,
+                            changes,
+                            seq,
                             deleted: true,
                             doc: None,
                         });
                     } else {
-                        let doc = if let Some(doc) = Reflect::get(&info, &JsValue::from_str("doc")).ok().filter(|value| !value.is_undefined()) {
+                        let doc = if let Some(doc) = Reflect::get(&info, &JsValue::from_str("doc"))
+                            .ok()
+                            .filter(|value| !value.is_undefined())
+                        {
                             SerializedDocument::try_from(doc).ok()
                         } else {
                             None
                         };
                         return Ok(ChangeEvent {
-                            id, changes, seq, doc,
+                            id,
+                            changes,
+                            seq,
+                            doc,
                             deleted: false,
                         });
                     }
@@ -75,11 +98,12 @@ impl ChangesEventEmitter {
         &self,
         listener: impl Fn(ChangeEvent) + 'static,
     ) -> Result<EventListener, JsValue> {
-        self.0.add_listener(&EventName::string("change"), move |info| {
-            if let Ok(event) = ChangeEvent::new(&info) {
-                listener(event);
-            }
-        })
+        self.0
+            .add_listener(&EventName::string("change"), move |info| {
+                if let Ok(event) = ChangeEvent::new(&info) {
+                    listener(event);
+                }
+            })
     }
 
     /// This event fires when all changes have been read. Only cancelling
@@ -88,9 +112,8 @@ impl ChangesEventEmitter {
         &self,
         listener: impl Fn() + 'static, // TODO: FnOnce
     ) -> Result<EventListener, JsValue> {
-        self.0.add_listener(&EventName::string("complete"), move |_| {
-            listener()
-        })
+        self.0
+            .add_listener(&EventName::string("complete"), move |_| listener())
     }
 
     /// This event is fired when the changes feed is stopped due to an

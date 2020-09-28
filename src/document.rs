@@ -1,8 +1,8 @@
-use js_sys::{JsString, Reflect, Object, Promise, Array, Uint8Array, JSON, WebAssembly};
-use serde::{Serialize, Deserialize};
+use js_sys::{Array, JsString, Object, Promise, Reflect, Uint8Array, WebAssembly, JSON};
+use serde::{Deserialize, Serialize};
 use serde_json::error::Result as SerdeResult;
 use std::{collections::HashMap, convert::TryFrom};
-use wasm_bindgen::{JsCast, JsValue, closure::Closure};
+use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Blob, BlobPropertyBag, FileReader};
 
@@ -36,8 +36,8 @@ impl From<&str> for Revision {
 impl std::fmt::Debug for Revision {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Revision")
-         .field(&self.0.as_string().unwrap())
-         .finish()
+            .field(&self.0.as_string().unwrap())
+            .finish()
     }
 }
 
@@ -77,7 +77,11 @@ where
             let root = Object::new();
             for (name, blob) in &attachments {
                 let attachment = Object::new();
-                Reflect::set(&attachment, &JsValue::from_str("content_type"), &JsValue::from_str(&blob.type_()))?;
+                Reflect::set(
+                    &attachment,
+                    &JsValue::from_str("content_type"),
+                    &JsValue::from_str(&blob.type_()),
+                )?;
                 Reflect::set(&attachment, &JsValue::from_str("data"), &blob)?;
                 Reflect::set(&root, &JsValue::from_str(&name), &attachment)?;
             }
@@ -106,7 +110,7 @@ pub enum Attachment {
     Stub {
         content_type: String,
         digest: String,
-    }
+    },
 }
 
 impl Attachment {
@@ -119,26 +123,24 @@ impl Attachment {
 }
 
 fn blob_to_arraybuffer(blob: &Blob) -> Promise {
-    Promise::new(&mut |resolve, reject| {
-        match FileReader::new() {
-            Ok(reader) => {
-                let inner_reject = reject.clone();
-                let inner_reader = reader.clone();
-                let converter = Closure::once(move || {
-                    match inner_reader.result().map(|buffer| buffer.unchecked_into()) {
-                        Ok(buffer) => resolve.call1(&JsValue::NULL, &buffer),
-                        Err(err) => inner_reject.call1(&JsValue::NULL, &err),
-                    }
-                });
-                reader.set_onerror(Some(&reject));
-                reader.set_onloadend(Some(converter.as_ref().unchecked_ref()));
-                if let Err(err) = reader.read_as_array_buffer(blob) {
-                    reject.call1(&JsValue::NULL, &err).ok();
+    Promise::new(&mut |resolve, reject| match FileReader::new() {
+        Ok(reader) => {
+            let inner_reject = reject.clone();
+            let inner_reader = reader.clone();
+            let converter = Closure::once(move || {
+                match inner_reader.result().map(|buffer| buffer.unchecked_into()) {
+                    Ok(buffer) => resolve.call1(&JsValue::NULL, &buffer),
+                    Err(err) => inner_reject.call1(&JsValue::NULL, &err),
                 }
-            }
-            Err(err) => {
+            });
+            reader.set_onerror(Some(&reject));
+            reader.set_onloadend(Some(converter.as_ref().unchecked_ref()));
+            if let Err(err) = reader.read_as_array_buffer(blob) {
                 reject.call1(&JsValue::NULL, &err).ok();
             }
+        }
+        Err(err) => {
+            reject.call1(&JsValue::NULL, &err).ok();
         }
     })
 }
@@ -154,7 +156,14 @@ pub struct SerializedDocument {
 }
 
 impl SerializedDocument {
-    pub fn deserialize<T>(self) -> (String, Option<Revision>, SerdeResult<T>, HashMap<String, Attachment>)
+    pub fn deserialize<T>(
+        self,
+    ) -> (
+        String,
+        Option<Revision>,
+        SerdeResult<T>,
+        HashMap<String, Attachment>,
+    )
     where
         T: for<'a> Deserialize<'a>,
     {
@@ -167,20 +176,31 @@ impl SerializedDocument {
                 promises.push(&blob_to_arraybuffer(blob));
             }
         }
-        let arraybuffers: Array = JsFuture::from(Promise::all(promises.as_ref())).await?.unchecked_into();
+        let arraybuffers: Array = JsFuture::from(Promise::all(promises.as_ref()))
+            .await?
+            .unchecked_into();
 
         let json = JSON::stringify(&self.data)?.as_string().unwrap();
         let data: serde_json::Value = serde_json::from_str(&json).unwrap();
 
         Ok(SerializedDocumentData {
             id: self.id,
-            attachments: self.attachments.into_iter().filter(|(_, attachment)| !attachment.is_stub()).zip(arraybuffers.iter()).map(|((name, attachment), arraybuffer)| {
-                if let Attachment::Data { blob, .. } = attachment {
-                    (name, (blob.type_(), Uint8Array::new(arraybuffer.as_ref()).to_vec()))
-                } else {
-                    panic!()
-                }
-            }).collect::<HashMap<String, (String, Vec<u8>)>>(),
+            attachments: self
+                .attachments
+                .into_iter()
+                .filter(|(_, attachment)| !attachment.is_stub())
+                .zip(arraybuffers.iter())
+                .map(|((name, attachment), arraybuffer)| {
+                    if let Attachment::Data { blob, .. } = attachment {
+                        (
+                            name,
+                            (blob.type_(), Uint8Array::new(arraybuffer.as_ref()).to_vec()),
+                        )
+                    } else {
+                        panic!()
+                    }
+                })
+                .collect::<HashMap<String, (String, Vec<u8>)>>(),
             data,
         })
     }
@@ -208,35 +228,60 @@ impl TryFrom<JsValue> for SerializedDocument {
         let rev = Reflect::get(&data, &JsValue::from_str("_rev"))
             .ok()
             .map(Revision);
-        let conflicts = Reflect::get(&data, &JsValue::from_str("_conflicts")).ok().filter(|conflicts| conflicts.is_truthy())
+        let conflicts = Reflect::get(&data, &JsValue::from_str("_conflicts"))
+            .ok()
+            .filter(|conflicts| conflicts.is_truthy())
             .map(|conflicts| {
                 <js_sys::Array as std::convert::From<JsValue>>::from(conflicts)
                     .iter()
                     .map(Revision)
                     .collect()
             })
-            .unwrap_or_else(|| Vec::new());
+            .unwrap_or_else(Vec::new);
         let attachments = Reflect::get(&data, &JsValue::from_str("_attachments"))
             .and_then(|attachments| {
                 Ok(Reflect::own_keys(&attachments)?
                     .iter()
                     .filter_map(|name| {
                         if let Ok(object) = Reflect::get(&attachments, &name) {
-                            if let (Some(name), Some(digest)) = (name.as_string(), Reflect::get(&object, &JsValue::from_str("digest")).ok().filter(|digest| digest.is_truthy()).and_then(|digest| digest.as_string())) {
-                                if Reflect::get(&object, &JsValue::from_str("stub")).map(|stub| stub.is_truthy()).unwrap_or(false) {
-                                    if let Some(result) = Reflect::get(&object, &JsValue::from_str("content_type")).ok().filter(|ct| ct.is_truthy()).and_then(|ct| ct.as_string()).map(|content_type| {
-                                        (name, Attachment::Stub {
-                                            digest,
-                                            content_type,
-                                        })
-                                    }) {
+                            if let (Some(name), Some(digest)) = (
+                                name.as_string(),
+                                Reflect::get(&object, &JsValue::from_str("digest"))
+                                    .ok()
+                                    .filter(|digest| digest.is_truthy())
+                                    .and_then(|digest| digest.as_string()),
+                            ) {
+                                if Reflect::get(&object, &JsValue::from_str("stub"))
+                                    .map(|stub| stub.is_truthy())
+                                    .unwrap_or(false)
+                                {
+                                    if let Some(result) =
+                                        Reflect::get(&object, &JsValue::from_str("content_type"))
+                                            .ok()
+                                            .filter(|ct| ct.is_truthy())
+                                            .and_then(|ct| ct.as_string())
+                                            .map(|content_type| {
+                                                (
+                                                    name,
+                                                    Attachment::Stub {
+                                                        digest,
+                                                        content_type,
+                                                    },
+                                                )
+                                            })
+                                    {
                                         return Some(result);
                                     }
-                                } else if let Ok(data) = Reflect::get(&object, &JsValue::from_str("data")) {
-                                    return Some((name, Attachment::Data {
-                                        blob: data.into(),
-                                        digest,
-                                    }));
+                                } else if let Ok(data) =
+                                    Reflect::get(&object, &JsValue::from_str("data"))
+                                {
+                                    return Some((
+                                        name,
+                                        Attachment::Data {
+                                            blob: data.into(),
+                                            digest,
+                                        },
+                                    ));
                                 }
                             }
                         }
@@ -268,13 +313,16 @@ impl Document for SerializedDocument {
         Ok(self.data.clone())
     }
     fn attachments(&self) -> HashMap<String, Blob> {
-        self.attachments.iter().filter_map(|(name, attachment)| {
-            if let Attachment::Data { blob, .. } = attachment {
-                Some((name.clone(), blob.clone()))
-            } else {
-                None
-            }
-        }).collect()
+        self.attachments
+            .iter()
+            .filter_map(|(name, attachment)| {
+                if let Attachment::Data { blob, .. } = attachment {
+                    Some((name.clone(), blob.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
@@ -297,13 +345,25 @@ impl Document for SerializedDocumentData {
         JsValue::from_serde(&self.data).map_err(|err| JsValue::from_str(&format!("{}", err)))
     }
     fn attachments(&self) -> HashMap<String, Blob> {
-        let memory_buffer = wasm_bindgen::memory().dyn_into::<WebAssembly::Memory>().unwrap().buffer();
-        self.attachments.iter().filter_map(|(name, (mime_type, binary))| {
-            let binary_location = binary.as_ptr() as u32;
-            let buffer = js_sys::Uint8Array::new(&memory_buffer).subarray(binary_location, binary_location + binary.len() as u32);
-            let mut options = BlobPropertyBag::new();
-            options.type_(&mime_type);
-            Blob::new_with_u8_array_sequence_and_options(&js_sys::Array::of1(buffer.as_ref()).into(), &options).ok().map(|blob| (name.clone(), blob))
-        }).collect()
+        let memory_buffer = wasm_bindgen::memory()
+            .dyn_into::<WebAssembly::Memory>()
+            .unwrap()
+            .buffer();
+        self.attachments
+            .iter()
+            .filter_map(|(name, (mime_type, binary))| {
+                let binary_location = binary.as_ptr() as u32;
+                let buffer = js_sys::Uint8Array::new(&memory_buffer)
+                    .subarray(binary_location, binary_location + binary.len() as u32);
+                let mut options = BlobPropertyBag::new();
+                options.type_(&mime_type);
+                Blob::new_with_u8_array_sequence_and_options(
+                    &js_sys::Array::of1(buffer.as_ref()).into(),
+                    &options,
+                )
+                .ok()
+                .map(|blob| (name.clone(), blob))
+            })
+            .collect()
     }
 }
