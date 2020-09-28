@@ -413,10 +413,50 @@ impl PouchDB {
     }
 
     pub async fn replicate_oneshot<'a>(
-        _source: PouchDBOrStringRef<'a>,
-        _target: PouchDBOrStringRef<'a>,
-        _options: &Replication,
+        source: PouchDBOrStringRef<'a>,
+        target: PouchDBOrStringRef<'a>,
+        options: &Replication,
     ) -> Result<(), Error> {
+        let js_options = JsValue::from_serde(options)?;
+        if let Some(query_params) = &options.query_params {
+            if let (Some(js_options), Some(query_params)) = (
+                Object::try_from(&js_options),
+                Object::try_from(&query_params),
+            ) {
+                Object::assign(js_options, query_params);
+            }
+            if let Some(since) = &options.since {
+                Reflect::set(&js_options, &JsValue::from_str("since"), &since.0)?;
+            }
+        }
+
+        // these are needed to keep the references alive
+        let source_string;
+        let target_string;
+
+        let source = match source {
+            PouchDBOrStringRef::PouchDB(db) => {
+                <JsPouchDB as AsRef<wasm_bindgen::JsValue>>::as_ref(&db.0)
+            }
+            PouchDBOrStringRef::String(s) => {
+                source_string = JsValue::from_str(s);
+                &source_string
+            }
+        };
+        let target = match target {
+            PouchDBOrStringRef::PouchDB(db) => db.0.as_ref(),
+            PouchDBOrStringRef::String(s) => {
+                target_string = JsValue::from_str(s);
+                &target_string
+            }
+        };
+
+        JsFuture::from(
+            JsPouchDB::replicate_with_options(source, target, js_options)
+                .unchecked_into::<js_sys::Promise>(),
+        )
+        .await?;
+
         Ok(())
     }
 
