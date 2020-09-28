@@ -31,6 +31,18 @@ pub enum PouchDBOrStringRef<'a> {
     String(&'a str),
 }
 
+impl<'a> From<&'a PouchDB> for PouchDBOrStringRef<'a> {
+    fn from(db: &'a PouchDB) -> Self {
+        Self::PouchDB(db)
+    }
+}
+
+impl<'a> From<&'a str> for PouchDBOrStringRef<'a> {
+    fn from(db: &'a str) -> Self {
+        Self::String(db)
+    }
+}
+
 pub struct PouchDB(JsPouchDB);
 
 impl PouchDB {
