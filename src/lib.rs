@@ -11,7 +11,7 @@ use pouchdb_sys::PouchDB as JsPouchDB;
 pub mod options;
 use options::{
     all_docs::AllDocsOptions, changes::Changes, create::CreateOptions, fetch::FetchOptions,
-    replication::Replication,
+    query::QueryOptions, replication::Replication,
 };
 pub mod responses;
 use responses::*;
@@ -463,6 +463,64 @@ impl PouchDB {
     pub async fn close(&self) -> Result<(), Error> {
         JsFuture::from(self.0.close()).await?;
         Ok(())
+    }
+
+    pub async fn query(
+        &self,
+        mut filter: impl 'static + FnMut(JsValue) -> Option<JsValue>,
+        options: QueryOptions,
+    ) -> Result<Vec<SerializedDocument>, Error> {
+        let closure = wasm_bindgen::closure::Closure::wrap(Box::new(
+            move |document, emit: js_sys::Function| {
+                if let Some(result) = filter(document) {
+                    emit.call1(&JsValue::UNDEFINED, &result).ok();
+                }
+            },
+        )
+            as Box<dyn FnMut(JsValue, js_sys::Function)>);
+
+        let response = JsFuture::from(self.0.query_with_options(
+            closure.as_ref().unchecked_ref(),
+            JsValue::from_serde(&options).unwrap(),
+        ))
+        .await?;
+        let rows: js_sys::Array = Reflect::get(&response, &JsValue::from_str("rows"))?.into();
+        Ok(rows
+            .iter()
+            .filter_map(|row| {
+                if !Reflect::has(&row, &JsValue::from_str("error")).unwrap_or(true) {
+                    if let Some(value) = Reflect::get(&row, &JsValue::from_str("value"))
+                        .ok()
+                        .filter(|value| !value.is_undefined())
+                    {
+                        if Reflect::get(&value, &JsValue::from_str("deleted"))
+                            .map(|deleted| deleted.is_truthy())
+                            .unwrap_or(false)
+                        {
+                            if let Some(rev) = Reflect::get(&value, &JsValue::from_str("rev"))
+                                .ok()
+                                .filter(|value| !value.is_undefined())
+                            {
+                                if let Some(id) = Reflect::get(&row, &JsValue::from_str("id"))
+                                    .ok()
+                                    .filter(|value| !value.is_undefined())
+                                {
+                                    if let Some(id) = id.as_string() {
+                                        return Some(SerializedDocument::new_deleted(&id, rev));
+                                    }
+                                }
+                            }
+                        } else if let Some(doc) = Reflect::get(&row, &JsValue::from_str("doc"))
+                            .ok()
+                            .filter(|value| !value.is_undefined())
+                        {
+                            return SerializedDocument::try_from(doc).ok();
+                        }
+                    }
+                }
+                None
+            })
+            .collect())
     }
 }
 

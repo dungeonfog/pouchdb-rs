@@ -124,10 +124,10 @@ extern "C" {
     pub fn delete_index(this: &PouchDB, index: JsValue) -> Promise;
 
     #[wasm_bindgen(method, js_class = default)]
-    pub fn query(this: &PouchDB, fun: Function) -> Promise;
+    pub fn query(this: &PouchDB, fun: &Function) -> Promise;
 
     #[wasm_bindgen(method, js_class = default, js_name = query)]
-    pub fn query_with_options(this: &PouchDB, fun: Function, options: JsValue) -> Promise;
+    pub fn query_with_options(this: &PouchDB, fun: &Function, options: JsValue) -> Promise;
 
     #[wasm_bindgen(method, js_class = default, js_name = viewCleanup)]
     pub fn view_Cleanup(this: &PouchDB) -> Promise;
