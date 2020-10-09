@@ -1,6 +1,6 @@
 use super::all_docs::AllDocsOptions;
 use serde::Serialize;
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum StaleOption {
     /// Returns results immediately, even if they’re out-of-date.
@@ -10,7 +10,7 @@ pub enum StaleOption {
 }
 
 /// All options default to false unless otherwise specified.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, Debug)]
 pub struct QueryOptions {
     /// Query has the same options that all_docs has
     #[serde(flatten)]

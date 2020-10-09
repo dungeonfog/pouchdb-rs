@@ -4,7 +4,7 @@ use serde::Serialize;
 ///
 /// Notes: For pagination, [limit] and [skip] are also available, but the same performance
 /// concerns as in CouchDB apply. Use the [startkey/endkey pattern](http://docs.couchdb.org/en/latest/couchapp/views/pagination.html) instead.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct AllDocsOptions {
     /// Include the document itself in each row in the doc field.
     /// Otherwise by default you only get the id and rev properties.
