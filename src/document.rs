@@ -2,9 +2,9 @@ use js_sys::{Array, JsString, Object, Promise, Reflect, Uint8Array, WebAssembly,
 use serde::{Deserialize, Serialize};
 use serde_json::error::Result as SerdeResult;
 use std::{collections::HashMap, convert::TryFrom};
-use wasm_bindgen::{closure::Closure, JsCast, JsValue};
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{Blob, BlobPropertyBag, FileReader};
+use web_sys::{Blob, BlobPropertyBag};
 
 #[derive(Clone, PartialEq)]
 pub struct Revision(pub(crate) JsValue);
@@ -122,29 +122,6 @@ impl Attachment {
     }
 }
 
-fn blob_to_arraybuffer(blob: &Blob) -> Promise {
-    Promise::new(&mut |resolve, reject| match FileReader::new() {
-        Ok(reader) => {
-            let inner_reject = reject.clone();
-            let inner_reader = reader.clone();
-            let converter = Closure::once(move || {
-                match inner_reader.result().map(|buffer| buffer.unchecked_into()) {
-                    Ok(buffer) => resolve.call1(&JsValue::NULL, &buffer),
-                    Err(err) => inner_reject.call1(&JsValue::NULL, &err),
-                }
-            });
-            reader.set_onerror(Some(&reject));
-            reader.set_onloadend(Some(converter.as_ref().unchecked_ref()));
-            if let Err(err) = reader.read_as_array_buffer(blob) {
-                reject.call1(&JsValue::NULL, &err).ok();
-            }
-        }
-        Err(err) => {
-            reject.call1(&JsValue::NULL, &err).ok();
-        }
-    })
-}
-
 #[derive(Debug, Clone)]
 pub struct SerializedDocument {
     pub id: String,
@@ -173,7 +150,7 @@ impl SerializedDocument {
         let promises = Array::new();
         for (_, attachment) in self.attachments.iter() {
             if let Attachment::Data { blob, .. } = attachment {
-                promises.push(&blob_to_arraybuffer(blob));
+                promises.push(&blob.array_buffer());
             }
         }
         let arraybuffers: Array = JsFuture::from(Promise::all(promises.as_ref()))
